@@ -1,11 +1,34 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import { fileURLToPath } from "node:url";
 import { shouldTrackDevServerPath } from "./dev-runner-paths.mjs";
+
+/**
+ * Parse a .env file and return key/value pairs.
+ * Only sets values that are not already in process.env so the shell
+ * environment always wins over the file.
+ */
+function loadDotenvFile(filePath) {
+  if (!existsSync(filePath)) return {};
+  const result = {};
+  const lines = readFileSync(filePath, "utf8").split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eqIdx = trimmed.indexOf("=");
+    if (eqIdx < 1) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const raw = trimmed.slice(eqIdx + 1).trim();
+    // Strip surrounding quotes if present
+    const value = /^["'].*["']$/.test(raw) ? raw.slice(1, -1) : raw;
+    if (key && !(key in process.env)) result[key] = value;
+  }
+  return result;
+}
 
 const mode = process.argv[2] === "watch" ? "watch" : "dev";
 const cliArgs = process.argv.slice(3);
@@ -75,6 +98,9 @@ if (process.env.npm_config_authenticated_private === "true") {
 
 const env = {
   ...process.env,
+  // Load repo-root .env first so PAPERCLIP_HOME and other workspace-local
+  // overrides are always applied before the server reads its own config.
+  ...loadDotenvFile(path.join(repoRoot, ".env")),
   PAPERCLIP_UI_DEV_MIDDLEWARE: "true",
 };
 

@@ -33,9 +33,9 @@ import { resolveClaudeDesiredSkillNames } from "./skills.js";
 const __moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
 /**
- * Create a tmpdir with `.claude/skills/` containing symlinks to skills from
- * the repo's `skills/` directory, so `--add-dir` makes Claude Code discover
- * them as proper registered skills.
+ * Create a tmpdir with `.claude/skills/` containing symlinks (or copies on
+ * Windows without Developer Mode) to skills from the repo's `skills/`
+ * directory, so `--add-dir` makes Claude Code discover them as registered skills.
  */
 async function buildSkillsDir(config: Record<string, unknown>): Promise<string> {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-skills-"));
@@ -50,10 +50,19 @@ async function buildSkillsDir(config: Record<string, unknown>): Promise<string> 
   );
   for (const entry of availableEntries) {
     if (!desiredNames.has(entry.key)) continue;
-    await fs.symlink(
-      entry.source,
-      path.join(target, entry.runtimeName),
-    );
+    const linkTarget = path.join(target, entry.runtimeName);
+    try {
+      await fs.symlink(entry.source, linkTarget);
+    } catch (err) {
+      // On Windows without Developer Mode, symlink creation fails with EPERM.
+      // Fall back to copying the skill directory so the run still works.
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === "EPERM" || code === "EACCES") {
+        await fs.cp(entry.source, linkTarget, { recursive: true });
+      } else {
+        throw err;
+      }
+    }
   }
   return tmp;
 }

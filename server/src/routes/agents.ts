@@ -966,7 +966,10 @@ export function agentRoutes(db: Db) {
       res.status(404).json({ error: "Agent not found" });
       return;
     }
-    res.json(await buildAgentDetail(agent));
+    // Agents receive their own identity/status but adapter_config and
+    // runtimeConfig values are redacted — secrets reach agents via the
+    // injected process environment at heartbeat time, not through the REST API.
+    res.json(await buildAgentDetail(agent, { restricted: true }));
   });
 
   router.get("/agents/me/inbox-lite", async (req, res) => {
@@ -1005,7 +1008,10 @@ export function agentRoutes(db: Db) {
       return;
     }
     assertCompanyAccess(req, agent.companyId);
-    if (req.actor.type === "agent" && req.actor.agentId !== id) {
+    if (req.actor.type === "agent") {
+      // Agents always get restricted view — adapter_config/runtimeConfig are
+      // redacted regardless of whether they are reading themselves or a peer.
+      // Secrets reach agents via injected process env at heartbeat time only.
       const canRead = await actorCanReadConfigurationsForCompany(req, agent.companyId);
       if (!canRead) {
         res.json(await buildAgentDetail(agent, { restricted: true }));

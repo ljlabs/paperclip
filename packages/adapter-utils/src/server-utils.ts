@@ -636,8 +636,20 @@ export function writePaperclipSkillSyncPreference(
 export async function ensurePaperclipSkillSymlink(
   source: string,
   target: string,
-  linkSkill: (source: string, target: string) => Promise<void> = (linkSource, linkTarget) =>
-    fs.symlink(linkSource, linkTarget),
+  linkSkill: (source: string, target: string) => Promise<void> = async (linkSource, linkTarget) => {
+    try {
+      await fs.symlink(linkSource, linkTarget);
+    } catch (err) {
+      // On Windows without Developer Mode, symlink creation fails with EPERM/EACCES.
+      // Fall back to copying the skill directory so adapters still work.
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === "EPERM" || code === "EACCES") {
+        await fs.cp(linkSource, linkTarget, { recursive: true });
+      } else {
+        throw err;
+      }
+    }
+  },
 ): Promise<"created" | "repaired" | "skipped"> {
   const existing = await fs.lstat(target).catch(() => null);
   if (!existing) {
