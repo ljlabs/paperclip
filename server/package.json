@@ -39,7 +39,8 @@
     "prepack": "pnpm run prepare:ui-dist",
     "postpack": "rm -rf ui-dist",
     "clean": "rm -rf dist",
-    "start": "node dist/index.js",
+    "start": "node --max-old-space-size=512 dist/index.js",
+    "start:low-mem": "node --max-old-space-size=256 --expose-gc dist/index.js",
     "typecheck": "pnpm --filter @paperclipai/plugin-sdk build && tsc --noEmit"
   },
   "dependencies": {

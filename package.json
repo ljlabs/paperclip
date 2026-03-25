@@ -9,6 +9,8 @@
     "dev:server": "pnpm --filter @paperclipai/server dev",
     "dev:ui": "pnpm --filter @paperclipai/ui dev",
     "build": "pnpm -r build",
+    "build:low-mem": "pnpm --filter @paperclipai/ui build && node scripts/prepare-server-ui-dist.mjs && pnpm --filter @paperclipai/server build",
+    "start:low-mem": "cross-env SERVE_UI=true PAPERCLIP_UI_DEV_MIDDLEWARE=false PAPERCLIP_LOG_PRETTY=false node --max-old-space-size=256 --expose-gc server/dist/index.js",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest",
     "test:run": "vitest run",

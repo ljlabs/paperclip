@@ -192,6 +192,55 @@ This starts the API server at `http://localhost:3100`. An embedded PostgreSQL da
 
 <br/>
 
+## Running modes
+
+### Development (default)
+
+```bash
+pnpm dev
+```
+
+Starts the API + UI in watch mode with Vite dev middleware. Hot-reloads on code changes. Best for local development.
+
+### Production / embedded device (low memory)
+
+For servers, Raspberry Pi, or any device with limited RAM (2 GB or less):
+
+```bash
+# Step 1 — build once (run on your dev machine or a build machine)
+pnpm build:low-mem
+
+# Step 2 — run the compiled output
+pnpm start:low-mem
+```
+
+`build:low-mem` produces a Vite-optimized production UI bundle (minified, tree-shaken) and compiles the server TypeScript. `start:low-mem` runs the compiled server with:
+
+- Static UI served directly from disk (no Vite dev server process)
+- Node.js heap capped at 256 MB (`--max-old-space-size=256`)
+- JSON log output only — no pino-pretty worker thread (`PAPERCLIP_LOG_PRETTY=false`)
+- GC exposed for manual tuning (`--expose-gc`)
+
+**Tuning via `.env`:**
+
+```env
+PAPERCLIP_HOME=./data                  # keep instance data in the workspace
+PAPERCLIP_LOG_PRETTY=false             # disable pretty-print worker thread (~25 MB saved)
+PAPERCLIP_MAX_CAPTURE_BYTES=524288     # cap stdout/stderr per agent run (default 512 KB)
+PAPERCLIP_JSON_BODY_LIMIT=2mb          # lower request body limit if not using company import/export
+```
+
+### Standard production
+
+```bash
+pnpm build
+pnpm --filter @paperclipai/server start
+```
+
+Runs the compiled server with a 512 MB heap cap and static UI. Use this when memory is not a constraint.
+
+<br/>
+
 ## FAQ
 
 **What does a typical setup look like?**
@@ -221,7 +270,9 @@ By default, agents run on scheduled heartbeats and event-based triggers (task as
 pnpm dev              # Full dev (API + UI, watch mode)
 pnpm dev:once         # Full dev without file watching
 pnpm dev:server       # Server only
-pnpm build            # Build all
+pnpm build            # Build all packages
+pnpm build:low-mem    # Build optimized production bundle (UI + server, for low-memory devices)
+pnpm start:low-mem    # Run compiled server with 256 MB heap cap and static UI
 pnpm typecheck        # Type checking
 pnpm test:run         # Run tests
 pnpm db:generate      # Generate DB migration

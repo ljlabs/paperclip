@@ -35,8 +35,11 @@ type ChildProcessWithEvents = ChildProcess & {
 };
 
 export const runningProcesses = new Map<string, RunningProcess>();
-export const MAX_CAPTURE_BYTES = 4 * 1024 * 1024;
-export const MAX_EXCERPT_BYTES = 32 * 1024;
+export const MAX_CAPTURE_BYTES = (() => {
+  const fromEnv = parseInt(process.env.PAPERCLIP_MAX_CAPTURE_BYTES ?? "", 10);
+  return Number.isFinite(fromEnv) && fromEnv > 0 ? fromEnv : 512 * 1024; // default 512 KB
+})();
+export const MAX_EXCERPT_BYTES = 16 * 1024;
 const SENSITIVE_ENV_KEY = /(key|token|secret|password|passwd|authorization|cookie)/i;
 const PAPERCLIP_SKILL_ROOT_RELATIVE_CANDIDATES = [
   "../../skills",

@@ -26,22 +26,31 @@ const sharedOpts = {
   singleLine: true,
 };
 
-export const logger = pino({
-  level: "debug",
-}, pino.transport({
-  targets: [
-    {
-      target: "pino-pretty",
-      options: { ...sharedOpts, ignore: "pid,hostname,req,res,responseTime", colorize: true, destination: 1 },
-      level: "info",
-    },
-    {
-      target: "pino-pretty",
-      options: { ...sharedOpts, colorize: false, destination: logFile, mkdir: true },
+// When PAPERCLIP_LOG_PRETTY=false (recommended for embedded/low-memory devices),
+// skip the pino-pretty worker thread and write JSON directly to the log file only.
+// This saves ~20-30 MB of RAM from the worker thread + pretty-print overhead.
+const prettyEnabled = process.env.PAPERCLIP_LOG_PRETTY !== "false";
+
+export const logger = prettyEnabled
+  ? pino({
       level: "debug",
-    },
-  ],
-}));
+    }, pino.transport({
+      targets: [
+        {
+          target: "pino-pretty",
+          options: { ...sharedOpts, ignore: "pid,hostname,req,res,responseTime", colorize: true, destination: 1 },
+          level: "info",
+        },
+        {
+          target: "pino-pretty",
+          options: { ...sharedOpts, colorize: false, destination: logFile, mkdir: true },
+          level: "debug",
+        },
+      ],
+    }))
+  : pino({
+      level: "info",
+    }, pino.destination({ dest: logFile, sync: false, mkdir: true }));
 
 export const httpLogger = pinoHttp({
   logger,

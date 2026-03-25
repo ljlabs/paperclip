@@ -359,6 +359,34 @@ export async function startServer(): Promise<StartedServer> {
             logEmbeddedPostgresFailure("initialise", err);
             throw err;
           }
+          // Write low-memory postgresql.conf tuning after first init.
+          // These settings are safe to apply on any hardware but are especially
+          // important on embedded/low-memory devices (< 2 GB RAM).
+          // Values can be overridden by editing the conf file directly.
+          if (process.env.PAPERCLIP_POSTGRES_LOW_MEMORY !== "false") {
+            try {
+              const { appendFileSync } = await import("node:fs");
+              const pgConf = resolve(dataDir, "postgresql.conf");
+              const tuning = [
+                "",
+                "# Paperclip low-memory tuning (added on first init)",
+                "# Remove or override these lines to use postgres defaults.",
+                "shared_buffers = 32MB",
+                "work_mem = 2MB",
+                "maintenance_work_mem = 16MB",
+                "max_connections = 10",
+                "wal_buffers = 1MB",
+                "checkpoint_completion_target = 0.9",
+                "effective_cache_size = 128MB",
+                "random_page_cost = 4.0",
+                "",
+              ].join("\n");
+              appendFileSync(pgConf, tuning, "utf8");
+              logger.info("Applied low-memory postgresql.conf tuning");
+            } catch (err) {
+              logger.warn({ err }, "Could not write postgresql.conf tuning — using postgres defaults");
+            }
+          }
         } else {
           logger.info(`Embedded PostgreSQL cluster already exists (${clusterVersionFile}); skipping init`);
         }
